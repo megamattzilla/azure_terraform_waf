@@ -1,0 +1,13 @@
+Monitor:
+- demo_health_monitor:
+    adaptive: false
+    class: Monitor
+    dscp: 0
+    interval: 6
+    monitorType: http
+    receive: OK$
+    send: 'GET /health HTTP/1.1\r\nConnection: Close\r\nHost: localhost\r\n\r\n'
+    targetAddress: ''
+    targetPort: 0
+    timeUntilUp: 0
+    timeout: 21

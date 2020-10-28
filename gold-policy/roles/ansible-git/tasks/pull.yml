@@ -1,0 +1,16 @@
+---
+- include_tasks: unpack.yml
+
+- name: git clone
+  git:
+    repo: "{{ git_url }}"
+    dest: "{{ git_repo_path }}"
+    accept_hostkey: yes
+    key_file: "{{ git_temp_file.path }}"
+
+- name: git checkout staging branch
+  shell: git checkout staging
+  args:
+    chdir: "{{ git_repo_path }}"
+
+- include_tasks: cleanup_keys.yml

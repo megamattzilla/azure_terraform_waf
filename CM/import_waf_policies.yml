@@ -1,0 +1,73 @@
+- name: Import BIG-IP Security Policies
+  hosts: tag_Ansible_ltm:!tag_environment_gold # select all ltm BIG-IPs except those in the gold environment
+  connection: local
+  vars:
+    base_git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_url: "git@example.local"
+    git_key: "{{ lookup('file','~/.ssh/id_rsa') }}"
+    git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_msg: "asm policy update"
+    git_local_only: true
+    staging_tag: "tag_purpose_test"  
+    provider:
+      server: "{{ ansible_host }}"
+      user: admin
+      password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+      validate_certs: false
+      server_port: 443
+  gather_facts: false
+  any_errors_fatal: true
+
+  tasks:
+    - name: Retrieve Latest Security Policy
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/master"
+        git_remove_local: false
+        git_version: "master"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true'     
+
+    - name: Retrieve Staging Security Policy
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/staging"
+        git_remove_local: false
+        git_version: "staging"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true'     
+
+    - name: Import Master Security Policy
+      bigip_asm_policy_import:
+        name: "{{ item | basename | regex_replace('.xml') }}"
+        source: "{{ item }}"
+        force: yes
+        provider: "{{ provider }}"
+      with_fileglob:
+        - "{{ base_git_repo_path }}/master/*.xml"
+      when: 'staging_tag not in group_names'
+      
+
+    - include: apply_security_policies_uri_loop.yml
+      with_fileglob:
+        - "{{ base_git_repo_path }}/master/*.xml"
+      when: 'staging_tag not in group_names'
+
+    - name: Import Staging Security Policy
+      bigip_asm_policy_import:
+        name: "{{ item | basename | regex_replace('.xml') }}"
+        source: "{{ item }}"
+        force: yes
+        provider: "{{ provider }}"
+      with_fileglob:
+        - "{{ base_git_repo_path }}/staging/*.xml"
+      when: 'staging_tag in group_names'
+
+    - include: apply_security_policies_uri_loop.yml
+      with_fileglob:
+        - "{{ base_git_repo_path }}/staging/*.xml"
+      when: 'staging_tag in group_names'

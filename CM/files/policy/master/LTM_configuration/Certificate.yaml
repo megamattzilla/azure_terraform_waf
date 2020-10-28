@@ -1,0 +1,7 @@
+Certificate:
+- certificate_default:
+    certificate:
+      bigip: /Common/default.crt
+    class: Certificate
+    privateKey:
+      bigip: /Common/default.key

@@ -1,0 +1,23 @@
+- name: Look for existing {{ item | basename | regex_replace('.xml') }}
+  uri:
+    url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/policies?$filter=name+eq+'{{ item | basename | regex_replace('.xml') }}'&$select=id"
+    user: admin
+    password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+    validate_certs: false
+    force_basic_auth: yes
+    method: GET
+    status_code: 200
+  register: policy_id_output
+- name: Applying policy for {{ item | basename | regex_replace('.xml') }}
+  uri:
+    url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/tasks/apply-policy"
+    user: admin
+    password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+    validate_certs: false
+    force_basic_auth: yes
+    method: POST
+    body_format: json
+    body:
+      policyReference: 
+        link: "https://localhost/mgmt/tm/asm/policies/{{ policy_id_output['json']['items'][0]['id'] }}"
+    status_code: 200, 201

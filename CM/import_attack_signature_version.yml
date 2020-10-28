@@ -1,0 +1,289 @@
+- name: Import BIG-IP Attack Signature Version
+  hosts: tag_Ansible_ltm:!tag_environment_gold # select all ltm BIG-IPs except those in the gold environment
+  connection: local
+  vars:
+    base_git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_url: "git@example.local"
+    git_key: "{{ lookup('file','~/.ssh/id_rsa') }}"
+    git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_msg: "asm policy update"
+    git_local_only: true
+    staging_tag: "tag_purpose_test"  
+    provider:
+      server: "{{ ansible_host }}"
+      user: admin
+      password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+      validate_certs: false
+      server_port: 443
+  gather_facts: false
+  any_errors_fatal: true
+
+  tasks:
+    - name: Retrieve Latest Attack Signature version from branchs 
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/master"
+        git_remove_local: false
+        git_version: "master"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true'     
+
+    - name: Retrieve Staging Attack Signature version
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/staging"
+        git_remove_local: false
+        git_version: "staging"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true'    
+
+    - stat:
+        path: "{{ item }}"
+      register: filestat
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"
+
+    - stat:
+        path: "{{ item }}"
+      register: filestatstage
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"
+
+    - name: Fetch Currently Installed signature version 
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations?$select=status,id,updateFileReference&$top=1"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installedfilereference
+
+    - name: Check Currently Installed signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}{{ installedfilereference.results[0].json['items'][0].updateFileReference.link.split(\"localhost\")[1] }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installedfile
+
+    - debug:
+        msg: "{{ ansible_host }} installed version {{ installedfile.results[0].json.filename }}"
+
+    - name: Upload master custom attack signature version file 
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/file-transfer/uploads/{{ item | basename }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        headers:
+          Content-Type: "application/octet-stream"
+          Content-Range: "0-{{ filestat.results[0].stat.size -1 }}/{{ filestat.results[0].stat.size }}"
+        return_content: yes
+        src: "{{ item }}"
+        status_code: 200, 201
+      delegate_to: localhost
+      when: 
+        - 'staging_tag not in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Upload staging custom attack signature version file 
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/file-transfer/uploads/{{ item | basename }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        headers:
+          Content-Type: "application/octet-stream"
+          Content-Range: "0-{{ filestatstage.results[0].stat.size -1 }}/{{ filestatstage.results[0].stat.size }}"
+        return_content: yes
+        src: "{{ item }}"
+        status_code: 200, 201
+      delegate_to: localhost
+      when: 
+        - 'staging_tag in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Create master custom attack signature version file 
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/update-files"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          filename: '{{ item | basename }}'
+        return_content: yes
+        status_code: 200, 201
+      register: updateid
+      when: 
+        - 'staging_tag not in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Create staging custom attack signature version file 
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/update-files"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          filename: '{{ item | basename }}'
+        return_content: yes
+        status_code: 200, 201
+      register: updateidstage
+      when: 
+        - 'staging_tag in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Create new task for master custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          updateFileReference:
+            link: "https://localhost/mgmt/tm/live-update/asm-attack-signatures/update-files/{{ updateid.results[0].json.id }}"
+        return_content: yes
+        status_code: 200, 201
+      register: createtaskid
+      when: 
+        - 'staging_tag not in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Create new task for staging custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          updateFileReference:
+            link: "https://localhost/mgmt/tm/live-update/asm-attack-signatures/update-files/{{ updateidstage.results[0].json.id }}"
+        return_content: yes
+        status_code: 200, 201
+      register: createtaskidstage
+      when: 
+        - 'staging_tag in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Install task for master custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations/{{ createtaskid.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: PATCH
+        body_format: json
+        body:
+          status: install
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskid
+      when: 
+        - 'staging_tag not in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Install task for staging custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations/{{ createtaskidstage.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: PATCH
+        body_format: json
+        body:
+          status: install
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskidstage
+      when: 
+        - 'staging_tag in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Get task status for master custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations/{{ installtaskid.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskstatus
+      until: installtaskstatus.json.status == 'install-complete'
+      retries: 180 # retry X times  
+      delay: 1 # pause for X sec b/w each call
+      when: 
+        - 'staging_tag not in group_names'
+        - 'installedfile.results[0].json.filename not in item'
+
+    - name: Get task status for staging custom attack signature version
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_signature_version/*.im"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/live-update/asm-attack-signatures/installations/{{ installtaskidstage.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskstatusstage
+      until: installtaskstatusstage.json.status == 'install-complete'
+      retries: 180 # retry X times  
+      delay: 1 # pause for X sec b/w each call
+      when: 
+        - 'staging_tag in group_names'
+        - 'installedfile.results[0].json.filename not in item'

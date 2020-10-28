@@ -1,0 +1,6 @@
+TLS_Server:
+- default-ssl-profile:
+    certificates:
+    - certificate: certificate_default
+    ciphers: '!EXPORT:!SSLv3:!TLSv1:ECDHE+AES-GCM:ECDHE+AES:RSA+AES-GCM:RSA+AES:+TLSv1_1'
+    class: TLS_Server

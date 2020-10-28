@@ -1,0 +1,13 @@
+---
+- include_tasks: unpack.yml
+
+- name: git clone
+  git:
+    repo: "{{ git_url }}"
+    dest: "{{ git_repo_path }}"
+    accept_hostkey: yes
+    key_file: "{{ git_temp_file.path }}"
+    version: "{{ git_version }}"
+
+- include_tasks: cleanup_keys.yml
+    

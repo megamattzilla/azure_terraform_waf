@@ -1,0 +1,6 @@
+TCP_Profile:
+- default-tcp-profile:
+    class: TCP_Profile
+    idleTimeout: 180
+    keepAliveInterval: 86400
+    slowStart: false

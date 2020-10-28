@@ -1,0 +1,26 @@
+Service_HTTP:
+- demo-http-web:
+    class: Service_HTTP
+    iRules:
+    - bigip: /Common/Demo_HTTP
+    layer4: tcp
+    persistenceMethods: []
+    policyWAF:
+      bigip: /Common/blocking.demo.prod
+    pool: demo_pool
+    profileBotDefense:
+      bigip: /Common/bot-defense-demo
+    profileDOS:
+      bigip: /Common/demo.dos
+    profileHTTP:
+      use: /Common/Shared/default-http-profile
+    profileTCP:
+      use: /Common/Shared/default-tcp-profile
+    securityLogProfiles:
+    - use: /Common/Shared/demo_default_logging
+    snat: auto
+    translateServerAddress: true
+    translateServerPort: true
+    virtualAddresses:
+    - 0.0.0.0/0
+    virtualPort: 80

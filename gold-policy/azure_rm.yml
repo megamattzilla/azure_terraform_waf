@@ -1,0 +1,14 @@
+# required for all azure_rm inventory plugin configs
+plugin: azure_rm
+
+# forces this plugin to use a CLI auth session instead of the automatic auth source selection (eg, prevents the
+# presence of 'ANSIBLE_AZURE_RM_X' environment variables from overriding CLI auth)
+auth_source: cli
+
+# fetches VMs from an explicit list of resource groups instead of default all (- '*')
+include_vm_resource_groups:
+  - _resource_group_
+
+keyed_groups:
+  - prefix: tag
+    key: tags

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<signatures export_version="13.1.1">
+<sig id="300000008">
+  <rev num="1">
+    <sig_name>Electrode Gift Card Access</sig_name>
+    <rule>uricontent:"/account/electrode/account/api/customer/:CID/gift-card"; nocase; objonly;</rule>
+    <last_update>2018-10-08 08:50:20</last_update>
+    <apply_to>Request</apply_to>
+    <risk>1</risk>
+    <accuracy>3</accuracy>
+    <doc>Access to Gift Card endpoints for tracking</doc>
+    <attack_type>Abuse of Functionality</attack_type>
+  </rev>
+</sig>
+<sig id="300000009">
+  <rev num="1">
+    <sig_name>Demo Custom Signature</sig_name>
+    <rule>uricontent:"/demo/path/:demo/demo"; nocase;</rule>
+    <last_update>2020-10-08 08:50:20</last_update>
+    <apply_to>Request</apply_to>
+    <risk>1</risk>
+    <accuracy>3</accuracy>
+    <doc>Access to demo URI</doc>
+    <attack_type>Abuse of Functionality</attack_type>
+  </rev>
+</sig>
+</signatures>

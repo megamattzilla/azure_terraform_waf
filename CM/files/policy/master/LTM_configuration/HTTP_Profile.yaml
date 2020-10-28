@@ -1,0 +1,11 @@
+HTTP_Profile:
+- default-http-profile:
+    class: HTTP_Profile
+    hstsIncludeSubdomains: false
+    maxHeaderCount: 256
+    maxHeaderSize: 65536
+    otherXFF:
+    - Demo-Client-IP
+    proxyType: reverse
+    serverHeaderValue: none
+    trustXFF: true

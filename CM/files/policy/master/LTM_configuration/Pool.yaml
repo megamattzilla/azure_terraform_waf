@@ -1,0 +1,11 @@
+Pool:
+- demo_pool:
+    class: Pool
+    members:
+    - addressDiscovery: static
+      serverAddresses:
+      - 192.168.1.100
+      servicePort: 8080
+      shareNodes: true
+    monitors:
+    - bigip: /Common/tcp

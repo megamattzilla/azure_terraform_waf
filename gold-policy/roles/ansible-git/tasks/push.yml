@@ -1,0 +1,58 @@
+---
+- include_tasks: unpack.yml
+
+- name: git add all new files
+  shell: git add -A
+  args:
+    chdir: "{{ git_repo_path }}"
+
+- name: git status
+  shell: git status
+  args:
+    chdir: "{{ git_repo_path }}"
+  register: git_add_status
+
+- name: git username
+  shell: git config user.name "{{ git_username }}"
+  args:
+    chdir: "{{ git_repo_path }}"
+  when: git_username is defined
+
+- name: git email
+  shell: git config user.email "{{ git_email }}"
+  args:
+    chdir: "{{ git_repo_path }}"
+  when: git_email is defined
+
+- name: git commit
+  shell: git commit -a -m "'{{ git_msg }}'"
+  args:
+    chdir: "{{ git_repo_path }}"
+  ignore_errors: true
+
+- name: git wrapper
+  copy:
+    dest: "{{ playbook_dir }}/.ssh/ssh"
+    content: "ssh -i {{ git_temp_file.path }} -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $*"
+    mode: 0700
+
+- name: tag repository with datestamp
+  shell: git tag {{ ansible_date_time.iso8601_basic }}
+  args:
+    chdir: "{{ git_repo_path }}"
+  ignore_errors: true
+
+- name: git push
+  shell: git push origin staging --force --tags 
+  args:
+    chdir: "{{ git_repo_path }}"
+  environment:
+    GIT_SSH: "{{ playbook_dir }}/.ssh/ssh"
+
+- name: git status
+  shell: git status
+  args:
+    chdir: "{{ git_repo_path }}"
+  register: git_add_status
+
+- include_tasks: cleanup_keys.yml

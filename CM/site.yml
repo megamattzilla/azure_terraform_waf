@@ -1,0 +1,7 @@
+# file: site.yml
+- import_playbook: import_custom_asm_signatures.yml
+- import_playbook: import_attack_signature_version.yml
+- import_playbook: import_waf_policies.yml
+- import_playbook: import_ltm_config.yml
+- import_playbook: create_declaration.yml
+- import_playbook: as3.yml

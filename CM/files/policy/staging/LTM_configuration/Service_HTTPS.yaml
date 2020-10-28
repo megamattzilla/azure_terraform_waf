@@ -1,0 +1,29 @@
+Service_HTTPS:
+- demo-https-web:
+    class: Service_HTTPS
+    clientTLS: demo-default-serverssl-profile
+    iRules:
+    - bigip: /Common/Demo_HTTP
+    layer4: tcp
+    persistenceMethods: []
+    policyWAF:
+      bigip: /Common/blocking.demo.prod
+    pool: demo_pool
+    profileBotDefense:
+      bigip: /Common/bot-defense-demo
+    profileDOS:
+      bigip: /Common/demo.prod
+    profileHTTP:
+      use: /Common/Shared/default-http-profile
+    profileTCP:
+      use: /Common/Shared/demo-default-tcp-profile
+    redirect80: false
+    securityLogProfiles:
+    - use: /Common/Shared/demo_default_logging
+    serverTLS: demo-clientssl
+    snat: auto
+    translateServerAddress: true
+    translateServerPort: true
+    virtualAddresses:
+    - 0.0.0.0/0
+    virtualPort: 2402

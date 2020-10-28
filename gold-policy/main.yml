@@ -1,0 +1,49 @@
+---
+- hosts: tag_Ansible_ltm:&tag_environment_gold # only working with ltm instances in the gold environment
+  connection: local
+  vars:
+    git_url: "git@example.local"
+    git_key: "{{ lookup('file','~/.ssh/git-ssh-key') }}"
+    git_repo_path: "{{ playbook_dir }}/policy"
+    git_msg: "asm policy update"
+    policy_partition: "Common"
+    security_policies:
+    - name: blocking.demo.prod
+    - name: blocking.demo.dev
+    bigip_provider:
+      server: "{{ ansible_host }}"
+      user: "admin"
+      password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+      validate_certs: false
+
+  tasks:
+  - name: git pull
+    vars:
+      git_remove_local: false
+    include_role:
+      name: ansible-git
+      tasks_from: pull
+
+  - name: Export policy in XML format
+    with_items: "{{ security_policies }}"
+    bigip_asm_policy_fetch:
+      name: "{{ item.name }}"
+      dest: "{{ playbook_dir }}/files/{{ item.name + '.xml' }}"
+      partition: "{{ policy_partition }}"
+      provider: "{{ bigip_provider }}"
+    delegate_to: localhost
+
+  - name: Move policy into repo
+    shell: mv {{ playbook_dir }}/files/* {{ git_repo_path }}
+
+  - name: git push
+    vars:
+      git_remove_local: true
+    include_role:
+      name: ansible-git
+      tasks_from: push
+
+  - name: remove local repository
+    file:
+      path: "{{ git_repo_path }}"
+      state: absent

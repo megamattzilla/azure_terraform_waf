@@ -1,0 +1,58 @@
+- name: Create Declaration
+  hosts: localhost
+  connection: local
+  vars:
+    base_git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_url: "git@example.local"
+    git_key: "{{ lookup('file','~/.ssh/id_rsa') }}"
+    git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_msg: "asm policy update"
+    git_local_only: true
+    staging_tag: "tag_purpose_test"  
+    provider:
+      server: "{{ ansible_host }}"
+      user: admin
+      password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+      validate_certs: false
+      server_port: 443
+  gather_facts: false
+  any_errors_fatal: true
+
+  tasks:
+    - name: Include variables for master branch
+      include_vars:
+        file: "{{ playbook_dir }}/files/policy/master/LTM_configuration/{{ item }}.yaml"
+      loop:
+        - "Certificate"
+        - "HTTP_Profile"
+        - "Monitor"
+        - "Pool"
+        - "Security_Log_Profile"
+        - "Service_HTTP"
+        - "Service_HTTPS"
+        - "TCP_Profile"
+        - "TLS_Client"
+        - "TLS_Server"
+    - name: Render json declaration for master branch 
+      template:
+        src: "{{ playbook_dir }}/as3-webapp-declaration.j2"
+        dest: "{{ playbook_dir }}/files/policy/master/LTM_configuration/declaration-master.json"
+
+    - name: Include variables for staging branch
+      include_vars:
+        file: "{{ playbook_dir }}/files/policy/staging/LTM_configuration/{{ item }}.yaml"
+      loop:
+        - "Certificate"
+        - "HTTP_Profile"
+        - "Monitor"
+        - "Pool"
+        - "Security_Log_Profile"
+        - "Service_HTTP"
+        - "Service_HTTPS"
+        - "TCP_Profile"
+        - "TLS_Client"
+        - "TLS_Server"
+    - name: Render json declaration for staging branch 
+      template:
+        src: "{{ playbook_dir }}/as3-webapp-declaration.j2"
+        dest: "{{ playbook_dir }}/files/policy/staging/LTM_configuration/declaration-staging.json"

@@ -1,0 +1,7 @@
+Security_Log_Profile:
+- demo_default_logging:
+    application:
+      guaranteeLoggingEnabled: true
+      storageFilter:
+        requestType: illegal-including-staged-signatures
+    class: Security_Log_Profile

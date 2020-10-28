@@ -1,0 +1,122 @@
+- name: Import BIG-IP Custom Attack Signatures
+  hosts: tag_Ansible_ltm:!tag_environment_gold # select all ltm BIG-IPs except those in the gold environment
+  connection: local
+  vars:
+    base_git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_url: "git@example.local"
+    git_key: "{{ lookup('file','~/.ssh/id_rsa') }}"
+    git_repo_path: "{{ playbook_dir }}/files/policy"
+    git_msg: "asm policy update"
+    git_local_only: true
+    staging_tag: "tag_purpose_test"  
+    provider:
+      server: "{{ ansible_host }}"
+      user: admin
+      password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+      validate_certs: false
+      server_port: 443
+  gather_facts: false
+  any_errors_fatal: true
+
+  tasks:
+    - name: Retrieve Latest Attack Signatures from branchs 
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/master"
+        git_remove_local: false
+        git_version: "master"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true'    
+
+    - name: Retrieve Staging Security Policy
+      run_once: true
+      vars:
+        git_repo_path: "{{ base_git_repo_path }}/staging"
+        git_remove_local: false
+        git_version: "staging"
+      include_role:
+        name: ansible-git
+        tasks_from: pull
+      when: 'git_local_only != true' 
+
+    - name: Importing master custom attack signatures
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_custom_signatures/*.xml"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/tasks/update-signatures"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          isBase64: "true"
+          isUserDefined: "true"
+          file: "{{ lookup('file', '{{ item }}') | b64encode }}"
+        return_content: yes
+        status_code: 200, 201
+      delegate_to: localhost
+      register: installtaskid
+      when: 'staging_tag not in group_names'
+
+    - name: Importing staging custom attack signatures
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_custom_signatures/*.xml"  
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/tasks/update-signatures"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: POST
+        body_format: json
+        body:
+          isBase64: "true"
+          isUserDefined: "true"
+          file: "{{ lookup('file', '{{ item }}') | b64encode }}"
+        return_content: yes
+        status_code: 200, 201
+      delegate_to: localhost
+      register: installtaskidstage
+      when: 'staging_tag in group_names'
+
+    - name: Get task status for master custom attack signatures
+      with_fileglob:
+      - "{{ base_git_repo_path }}/master/ASM_custom_signatures/*.xml"
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/tasks/update-signatures/{{ installtaskid.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskstatus
+      until: installtaskstatus.json.status == 'COMPLETED'
+      retries: 180 # retry X times  
+      delay: 1 # pause for X sec b/w each call
+      when:
+        - 'staging_tag not in group_names'
+
+    - name: Get task status for staging custom attack signatures
+      with_fileglob:
+      - "{{ base_git_repo_path }}/staging/ASM_custom_signatures/*.xml"
+      uri:
+        url: "https://{{ ansible_host }}:{{ port | default('443')}}/mgmt/tm/asm/tasks/update-signatures/{{ installtaskidstage.results[0].json.id }}"
+        user: admin
+        password: "{{ lookup('env','BIGIP_PASSWORD') }}"
+        validate_certs: false
+        force_basic_auth: yes
+        method: GET
+        return_content: yes
+        status_code: 200, 201
+      register: installtaskstatusstage
+      until: installtaskstatusstage.json.status == 'COMPLETED'
+      retries: 180 # retry X times  
+      delay: 1 # pause for X sec b/w each call
+      when:
+        - 'staging_tag in group_names'
